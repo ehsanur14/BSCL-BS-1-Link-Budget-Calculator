@@ -216,6 +216,14 @@ def panel_title(title, status=None):
     st.markdown(f'<div class="panel-title-row"><div class="panel-title">{title}</div>{status_html}</div>', unsafe_allow_html=True)
 
 
+def render_input_panel_header():
+    title_col, button_col = st.columns([4.5, 1.1], gap="small")
+    with title_col:
+        st.markdown('<div class="panel-title-row"><div class="panel-title">Calculation Inputs</div></div>', unsafe_allow_html=True)
+    with button_col:
+        return st.button("Calculate", key="calculate_outputs_button", use_container_width=True)
+
+
 def open_panel(class_name="app-panel"):
     return None
 
@@ -741,6 +749,9 @@ session_defaults({
     "downlink_saved_location": (14.58, 90.99),
     "active_map_picker": None,
 })
+st.session_state.setdefault("stored_forward_output", EMPTY_OUTPUT.copy())
+st.session_state.setdefault("stored_return_output", EMPTY_OUTPUT.copy())
+st.session_state.setdefault("stored_debug_payload", {})
 
 satellite_longitude = SATELLITE_PRESETS[SATELLITE_NAME]["orbital_longitude_deg"]
 
@@ -753,7 +764,7 @@ render_header()
 main_left, main_right = st.columns([1.28, 1.0], gap="large")
 with main_left:
     open_panel()
-    panel_title("Calculation Inputs")
+    calculate_clicked = render_input_panel_header()
     section_bar("Calculation Inputs")
     purpose, frequency_band, uplink_site = render_top_controls()
     selected_bscl_station = resolve_bscl_station(uplink_site)
@@ -787,7 +798,7 @@ if not validate_coordinates(downlink_lat, downlink_lon):
 uplink_pos = safe_position(uplink_lat, uplink_lon, satellite_longitude)
 downlink_pos = safe_position(downlink_lat, downlink_lon, satellite_longitude)
 
-forward_output, return_output, debug_payload = calculate_outputs({
+current_inputs = {
     "purpose": purpose,
     "frequency_band": frequency_band,
     "band_info": band_info,
@@ -806,11 +817,21 @@ forward_output, return_output, debug_payload = calculate_outputs({
     "downlink_lat": downlink_lat,
     "uplink_pos": uplink_pos,
     "downlink_pos": downlink_pos,
-})
+}
+
+if calculate_clicked:
+    forward_output, return_output, debug_payload = calculate_outputs(current_inputs)
+    st.session_state.stored_forward_output = forward_output
+    st.session_state.stored_return_output = return_output
+    st.session_state.stored_debug_payload = debug_payload
+
+forward_output = st.session_state.stored_forward_output
+return_output = st.session_state.stored_return_output
+debug_payload = st.session_state.stored_debug_payload
 
 with main_right:
     open_panel()
-    panel_title("Outputs", "Calculated")
+    panel_title("Outputs")
     section_bar("Antenna Positioning")
     p1, p2 = st.columns(2, gap="small")
     with p1:
