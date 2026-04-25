@@ -642,7 +642,7 @@ def render_input_panel_header():
     with title_col:
         st.markdown('<div class="panel-title-row"><div class="panel-title">Calculation Inputs</div></div>', unsafe_allow_html=True)
     with button_col:
-        return st.button("Calculate", key="calculate_outputs_button", use_container_width=True)
+        return st.form_submit_button("Calculate", use_container_width=True)
 
 
 def open_panel(class_name="app-panel"):
@@ -704,13 +704,15 @@ def resolve_bscl_station(uplink_site):
     return station
 
 
-def render_uplink_inputs(purpose, selected_station, uplink_freq_default):
+def render_uplink_location_controls(selected_station):
     subhead("Uplink Information")
     if selected_station is None:
         read_map_coordinates("uplink")
     else:
         info_line(f"BSCL Station: {selected_station}, Bangladesh")
 
+
+def render_uplink_inputs(purpose, selected_station, uplink_freq_default):
     disabled = selected_station is not None
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
@@ -736,10 +738,12 @@ def render_uplink_inputs(purpose, selected_station, uplink_freq_default):
     return uplink_lon, uplink_lat, bandwidth, feed_power, antenna_dia
 
 
-def render_downlink_inputs(purpose, downlink_freq_default):
+def render_downlink_location_controls():
     subhead("Downlink Information")
     read_map_coordinates("downlink")
 
+
+def render_downlink_inputs(purpose, downlink_freq_default):
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
         downlink_lon = st.number_input("Longitude (deg E)", format="%.6f", key="downlink_long")
@@ -1190,7 +1194,6 @@ render_header()
 main_left, main_right = st.columns([1.28, 1.0], gap="large")
 with main_left:
     open_panel()
-    calculate_clicked = render_input_panel_header()
     section_bar("Calculation Inputs")
     purpose, frequency_band, uplink_site = render_top_controls()
     selected_bscl_station = resolve_bscl_station(uplink_site)
@@ -1199,16 +1202,23 @@ with main_left:
     uplink_freq_default = float(band_info["frequency_ghz"]["uplink"])
     downlink_freq_default = float(band_info["frequency_ghz"]["downlink"])
 
-    uplink_lon, uplink_lat, uplink_bandwidth, uplink_feed_power, uplink_antenna_dia = render_uplink_inputs(
-        purpose,
-        selected_bscl_station,
-        uplink_freq_default,
-    )
+    render_uplink_location_controls(selected_bscl_station)
     st.markdown('<div style="height:.45rem"></div>', unsafe_allow_html=True)
-    downlink_lon, downlink_lat, downlink_antenna_dia, return_link_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb = render_downlink_inputs(
-        purpose,
-        downlink_freq_default,
-    )
+    render_downlink_location_controls()
+    st.markdown('<div style="height:.45rem"></div>', unsafe_allow_html=True)
+
+    with st.form("calculation_form", clear_on_submit=False):
+        calculate_clicked = render_input_panel_header()
+        uplink_lon, uplink_lat, uplink_bandwidth, uplink_feed_power, uplink_antenna_dia = render_uplink_inputs(
+            purpose,
+            selected_bscl_station,
+            uplink_freq_default,
+        )
+        st.markdown('<div style="height:.45rem"></div>', unsafe_allow_html=True)
+        downlink_lon, downlink_lat, downlink_antenna_dia, return_link_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb = render_downlink_inputs(
+            purpose,
+            downlink_freq_default,
+        )
     close_panel()
 
 if not validate_coordinates(uplink_lat, uplink_lon):
