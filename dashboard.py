@@ -823,6 +823,10 @@ def make_output(link_result, modcod_result, direction):
     }
 
 
+def has_visible_output(output):
+    return any(output.get(key) not in (None, "") for key in OUTPUT_KEYS)
+
+
 @st.cache_data(show_spinner=False)
 def calculate_outputs(inputs):
     forward_output = EMPTY_OUTPUT.copy()
@@ -1246,6 +1250,12 @@ if calculate_clicked:
     st.session_state.stored_return_output = return_output
     st.session_state.stored_debug_payload = debug_payload
     st.rerun()
+
+if not has_visible_output(st.session_state.stored_forward_output):
+    forward_output, return_output, debug_payload = calculate_outputs(current_inputs)
+    st.session_state.stored_forward_output = forward_output
+    st.session_state.stored_return_output = return_output
+    st.session_state.stored_debug_payload = debug_payload
 
 forward_output = st.session_state.stored_forward_output
 return_output = st.session_state.stored_return_output
