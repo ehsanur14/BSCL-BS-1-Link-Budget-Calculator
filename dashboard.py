@@ -1177,6 +1177,7 @@ session_defaults({
 st.session_state.setdefault("stored_forward_output", EMPTY_OUTPUT.copy())
 st.session_state.setdefault("stored_return_output", EMPTY_OUTPUT.copy())
 st.session_state.setdefault("stored_debug_payload", {})
+st.session_state.setdefault("stored_inputs", None)
 
 satellite_longitude = SATELLITE_PRESETS[SATELLITE_NAME]["orbital_longitude_deg"]
 
@@ -1249,13 +1250,14 @@ if calculate_clicked:
     st.session_state.stored_forward_output = forward_output
     st.session_state.stored_return_output = return_output
     st.session_state.stored_debug_payload = debug_payload
-    st.rerun()
+    st.session_state.stored_inputs = dict(current_inputs)
 
 if not has_visible_output(st.session_state.stored_forward_output):
     forward_output, return_output, debug_payload = calculate_outputs(current_inputs)
     st.session_state.stored_forward_output = forward_output
     st.session_state.stored_return_output = return_output
     st.session_state.stored_debug_payload = debug_payload
+    st.session_state.stored_inputs = dict(current_inputs)
 
 forward_output = st.session_state.stored_forward_output
 return_output = st.session_state.stored_return_output
