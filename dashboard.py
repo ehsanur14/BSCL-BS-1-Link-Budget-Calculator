@@ -714,9 +714,9 @@ def render_uplink_inputs(purpose, selected_station, uplink_freq_default):
     disabled = selected_station is not None
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
-        st.number_input("Longitude (deg E)", format="%.3f", key="uplink_long", disabled=disabled)
+        uplink_lon = st.number_input("Longitude (deg E)", format="%.3f", key="uplink_long", disabled=disabled)
     with c2:
-        st.number_input("Latitude (deg N)", format="%.3f", key="uplink_lat", disabled=disabled)
+        uplink_lat = st.number_input("Latitude (deg N)", format="%.3f", key="uplink_lat", disabled=disabled)
     with c3:
         st.text_input("Uplink Frequency (GHz)", value=f"{uplink_freq_default:.2f}", disabled=True)
 
@@ -733,7 +733,7 @@ def render_uplink_inputs(purpose, selected_station, uplink_freq_default):
     with c3:
         antenna_dia = st.number_input("Antenna Dia (m)", value=8.0, format="%.2f", key="uplink_ant_dia")
 
-    return bandwidth, feed_power, antenna_dia
+    return uplink_lon, uplink_lat, bandwidth, feed_power, antenna_dia
 
 
 def render_downlink_inputs(purpose, downlink_freq_default):
@@ -742,9 +742,9 @@ def render_downlink_inputs(purpose, downlink_freq_default):
 
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
-        st.number_input("Longitude (deg E)", format="%.6f", key="downlink_long")
+        downlink_lon = st.number_input("Longitude (deg E)", format="%.6f", key="downlink_long")
     with c2:
-        st.number_input("Latitude (deg N)", format="%.6f", key="downlink_lat")
+        downlink_lat = st.number_input("Latitude (deg N)", format="%.6f", key="downlink_lat")
     with c3:
         st.text_input("Downlink Frequency (GHz)", value=f"{downlink_freq_default:.3f}", disabled=True)
 
@@ -771,7 +771,7 @@ def render_downlink_inputs(purpose, downlink_freq_default):
     fwd_rx_lnb = 0.0
     rtn_rx_lnb = 0.0
 
-    return antenna_dia, return_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb
+    return downlink_lon, downlink_lat, antenna_dia, return_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb
 
 
 def render_position(title, position, prefix):
@@ -1199,22 +1199,17 @@ with main_left:
     uplink_freq_default = float(band_info["frequency_ghz"]["uplink"])
     downlink_freq_default = float(band_info["frequency_ghz"]["downlink"])
 
-    uplink_bandwidth, uplink_feed_power, uplink_antenna_dia = render_uplink_inputs(
+    uplink_lon, uplink_lat, uplink_bandwidth, uplink_feed_power, uplink_antenna_dia = render_uplink_inputs(
         purpose,
         selected_bscl_station,
         uplink_freq_default,
     )
     st.markdown('<div style="height:.45rem"></div>', unsafe_allow_html=True)
-    downlink_antenna_dia, return_link_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb = render_downlink_inputs(
+    downlink_lon, downlink_lat, downlink_antenna_dia, return_link_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb = render_downlink_inputs(
         purpose,
         downlink_freq_default,
     )
     close_panel()
-
-uplink_lon = float(st.session_state["uplink_long"])
-uplink_lat = float(st.session_state["uplink_lat"])
-downlink_lon = float(st.session_state["downlink_long"])
-downlink_lat = float(st.session_state["downlink_lat"])
 
 if not validate_coordinates(uplink_lat, uplink_lon):
     st.warning("Uplink coordinates are outside valid range.")
@@ -1259,6 +1254,7 @@ if not has_visible_output(st.session_state.stored_forward_output):
     st.session_state.stored_debug_payload = debug_payload
     st.session_state.stored_inputs = dict(current_inputs)
 
+inputs_are_current = st.session_state.stored_inputs == current_inputs
 forward_output = st.session_state.stored_forward_output
 return_output = st.session_state.stored_return_output
 debug_payload = st.session_state.stored_debug_payload
@@ -1266,6 +1262,10 @@ debug_payload = st.session_state.stored_debug_payload
 with main_right:
     open_panel()
     panel_title("Outputs")
+    if inputs_are_current:
+        st.caption("Outputs are calculated from the current inputs.")
+    else:
+        st.warning("Inputs changed. Click Calculate to refresh the outputs.")
     section_bar("Antenna Positioning")
     p1, p2 = st.columns(2, gap="small")
     with p1:
