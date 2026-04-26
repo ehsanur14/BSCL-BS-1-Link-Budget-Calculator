@@ -1001,8 +1001,9 @@ with main_right:
     if o2 is not None:
         with o2:
             render_output("Return Link Output", return_output, "return_output")
-    if inputs_are_current and has_low_power_result(forward_output, return_output):
+    visible_outputs = (forward_output, return_output) if purpose == "VSAT" else (forward_output,)
+    if inputs_are_current and has_low_power_result(*visible_outputs):
         st.markdown('<div class="nb-note">NB: Insufficient transmit power. Please increase the transmission power.</div>', unsafe_allow_html=True)
-    if inputs_are_current and has_any_result(forward_output, return_output):
+    if inputs_are_current and has_any_result(*visible_outputs):
         st.markdown('<div class="best-case-note">The result is calculated for the best case scenario.</div>', unsafe_allow_html=True)
     close_panel()
