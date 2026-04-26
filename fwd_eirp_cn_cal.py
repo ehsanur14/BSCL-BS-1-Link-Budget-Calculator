@@ -100,7 +100,7 @@ class LinkInputs:
 @dataclass(slots=True)
 class SatelliteInputs:
     satellite_eirp_dbw: float
-    transponder_backoff_db: float = 0.7
+    transponder_backoff_db: float = 4.0
     transponder_c_im_db: float = 20.0
 
 def _round(v, nd=2):
