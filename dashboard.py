@@ -471,6 +471,8 @@ def link_inputs(freq, bandwidth, power, antenna_dia, slant_range, lnb=0.0, lon=N
 def make_output(link_result, modcod_result, direction):
     dashboard = link_result["dashboard_output"]
     modcod = modcod_result["dashboard_output"]
+    if modcod[f"{direction}_modcod"] in ("", None):
+        return EMPTY_OUTPUT.copy()
     return {
         "useful_eirp_dbw": dashboard[f"{direction}_useful_eirp_dbw"],
         "cni_db": dashboard[f"{direction}_effective_cni_db"],
@@ -1000,7 +1002,7 @@ with main_right:
         with o2:
             render_output("Return Link Output", return_output, "return_output")
     if inputs_are_current and has_low_power_result(forward_output, return_output):
-        st.markdown('<div class="nb-note">NB: Low Power transmitted. Transmission Power baraite hobe.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="nb-note">NB: Insufficient transmit power. Please increase the transmission power.</div>', unsafe_allow_html=True)
     if inputs_are_current and has_any_result(forward_output, return_output):
         st.markdown('<div class="best-case-note">The result is calculated for the best case scenario.</div>', unsafe_allow_html=True)
     close_panel()
