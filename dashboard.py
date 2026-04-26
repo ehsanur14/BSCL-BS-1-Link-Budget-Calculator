@@ -865,6 +865,7 @@ if active_map_picker in {"uplink", "downlink"}:
     render_map_picker_screen(active_map_picker)
     st.stop()
 
+render_header()
 main_left, main_right = st.columns([1.28, 1.0], gap="large")
 with main_left:
     open_panel()
