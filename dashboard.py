@@ -754,6 +754,14 @@ div[data-testid="stSelectbox"] > div{
     background:#fff!important;
     font-size:.92rem!important;
 }
+div[data-testid="stSelectbox"],
+div[data-testid="stSelectbox"] *,
+div[data-baseweb="select"],
+div[data-baseweb="select"] *,
+ul[role="listbox"],
+ul[role="listbox"] *{
+    border-radius:0!important;
+}
 div[data-testid="stTextInput"] input[disabled],
 div[data-testid="stNumberInput"] input[disabled]{
     background-color:var(--input)!important;
