@@ -13,6 +13,10 @@ C_LIGHT_MPS = 300_000_000.0
 BOLTZMANN_DB = 228.6
 DEFAULT_ROLL_OFF = 0.20
 DEFAULT_THRESHOLD_KM = 300.0
+KU_DEFAULT_EIRP_DBW = 48.0
+KU_CSV_DISTANCE_LIMIT_KM = 200.0
+BD_CSV_GT_DB_PER_K = 15.0
+OTHER_CSV_GT_DB_PER_K = 5.0
 KU_BAND_EIRP_CSVS = {
     "bangladesh": Path(__file__).with_name("KuBDband.csv"),
     "india": Path(__file__).with_name("KuINDband.csv"),
@@ -108,7 +112,7 @@ def _band_key(name: str) -> str:
 def _band_cfg(band_name: str):
     k = _band_key(band_name)
     if k == "ku band":
-        return KU_BAND_CONTOUR_DB, 53.50, 0.25, 0.25
+        return KU_BAND_CONTOUR_DB, KU_DEFAULT_EIRP_DBW, 0.25, 0.25
     if k == "c band":
         return C_BAND_CONTOUR_DB, 41.00, 0.10, 0.10
     raise ValueError("Unsupported band")
@@ -205,7 +209,8 @@ def resolve_ku_band_eirp_from_all_csvs(lon_deg: float, lat_deg: float, default_e
         if nearest is not None:
             candidates.append(nearest)
 
-    if not candidates:
+    in_range = [candidate for candidate in candidates if candidate[0] < KU_CSV_DISTANCE_LIMIT_KM]
+    if not in_range:
         return {
             "source": "default",
             "csv": None,
@@ -215,7 +220,7 @@ def resolve_ku_band_eirp_from_all_csvs(lon_deg: float, lat_deg: float, default_e
             "eirp_dbw": default_eirp_dbw,
         }
 
-    min_distance_km, csv_path, index, selected_row = max(candidates, key=lambda item: item[3]["eirp_dbw"])
+    min_distance_km, csv_path, index, selected_row = max(in_range, key=lambda item: item[3]["eirp_dbw"])
     return {
         "source": "csv",
         "csv": csv_path.name,
@@ -224,6 +229,11 @@ def resolve_ku_band_eirp_from_all_csvs(lon_deg: float, lat_deg: float, default_e
         "selected_row": selected_row,
         "eirp_dbw": selected_row["eirp_dbw"],
     }
+
+def gt_for_eirp_lookup(eirp_lookup):
+    if eirp_lookup is None or eirp_lookup.get("source") != "csv":
+        return OTHER_CSV_GT_DB_PER_K
+    return BD_CSV_GT_DB_PER_K if eirp_lookup.get("csv") == "KuBDband.csv" else OTHER_CSV_GT_DB_PER_K
 
 def resolve_contour_values(band_name: str, lon_deg: float, lat_deg: float, threshold_km: float = DEFAULT_THRESHOLD_KM):
     db, def_eirp, def_dl, def_ul = _band_cfg(band_name)
@@ -253,6 +263,7 @@ def resolve_contour_values(band_name: str, lon_deg: float, lat_deg: float, thres
         "eirp_index": None if eirp_lookup is None else eirp_lookup.get("index"),
         "eirp_min_distance_km": None if eirp_lookup is None else eirp_lookup["min_distance_km"],
         "eirp_selected_row": None if eirp_lookup is None else eirp_lookup["selected_row"],
+        "gt_db_per_k": gt_for_eirp_lookup(eirp_lookup) if _band_key(band_name) == "ku band" else 15.6,
         "att_cs_downlink_db": row["att_dl"] if use_db else def_dl,
         "att_cs_uplink_db": row["att_ul"] if use_db else def_ul,
     }
@@ -303,7 +314,7 @@ def calc_satellite_useful_eirp(sat: SatelliteInputs, rx: LinkInputs):
 
 def calc_downlink(useful_eirp_dbw, rx: LinkInputs):
     grx = antenna_gain_db(rx.frequency_ghz, rx.antenna_diameter_m, rx.efficiency_percent)
-    gt_db_per_k = grx - 10 * math.log10(rx.system_noise_temp_k)
+    gt_db_per_k = rx.gt_db_per_k
     fspl = fspl_db(rx.frequency_ghz, rx.slant_range_km)
     bw_hz = occ_bw_hz(rx.bandwidth_mhz, rx.roll_off)
 
@@ -368,7 +379,11 @@ def calculate_forward_and_return_for_dashboard(
         )
 
         f_ul = LinkInputs(**{**asdict(forward_uplink), "atmospheric_attenuation_db": f_contour["att_cs_uplink_db"]})
-        f_dl = LinkInputs(**{**asdict(forward_downlink), "atmospheric_attenuation_db": f_contour["att_cs_downlink_db"]})
+        f_dl = LinkInputs(**{
+            **asdict(forward_downlink),
+            "atmospheric_attenuation_db": f_contour["att_cs_downlink_db"],
+            "gt_db_per_k": f_contour["gt_db_per_k"],
+        })
         f_sat = SatelliteInputs(**{**asdict(forward_satellite), "satellite_eirp_dbw": f_contour["best_eirp_dbw"]})
 
         f_res = calculate_complete_link(f_ul, f_dl, f_sat)
@@ -389,7 +404,11 @@ def calculate_forward_and_return_for_dashboard(
                 return_contour_lat,
             )
             r_ul = LinkInputs(**{**asdict(return_uplink), "atmospheric_attenuation_db": r_contour["att_cs_uplink_db"]})
-            r_dl = LinkInputs(**{**asdict(return_downlink), "atmospheric_attenuation_db": r_contour["att_cs_downlink_db"]})
+            r_dl = LinkInputs(**{
+                **asdict(return_downlink),
+                "atmospheric_attenuation_db": r_contour["att_cs_downlink_db"],
+                "gt_db_per_k": r_contour["gt_db_per_k"],
+            })
             r_sat = SatelliteInputs(**{**asdict(return_satellite), "satellite_eirp_dbw": r_contour["best_eirp_dbw"]})
             r_res = calculate_complete_link(r_ul, r_dl, r_sat)
 

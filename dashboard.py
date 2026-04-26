@@ -439,6 +439,22 @@ def has_negative_elevation(*positions):
     return False
 
 
+def has_low_power_result(*outputs):
+    for output in outputs:
+        if not output:
+            continue
+        if output.get("useful_eirp_dbw") in ("", None) or output.get("cni_db") in ("", None) or output.get("modcod") in ("", None):
+            return True
+    return False
+
+
+def has_any_result(*outputs):
+    for output in outputs:
+        if output and any(output.get(key) not in ("", None) for key in OUTPUT_KEYS):
+            return True
+    return False
+
+
 def link_inputs(freq, bandwidth, power, antenna_dia, slant_range, lnb=0.0, lon=None, lat=None):
     return LinkInputs(
         frequency_ghz=freq,
@@ -803,6 +819,12 @@ div[data-testid="stNumberInput"] input[disabled]{
     padding:.32rem .58rem;
     margin:.16rem 0 .35rem 0;
 }
+.best-case-note{
+    color:#5a6b81;
+    font-size:.78rem;
+    font-weight:700;
+    margin:.22rem 0 .1rem 0;
+}
 div[data-testid="stCheckbox"]{padding-top:.18rem;}
 div[data-testid="stRadio"] label{font-weight:700!important;}
 div[data-testid="stButton"] > button{
@@ -977,4 +999,8 @@ with main_right:
     if o2 is not None:
         with o2:
             render_output("Return Link Output", return_output, "return_output")
+    if inputs_are_current and has_low_power_result(forward_output, return_output):
+        st.markdown('<div class="nb-note">NB: Low Power transmitted. Transmission Power baraite hobe.</div>', unsafe_allow_html=True)
+    if inputs_are_current and has_any_result(forward_output, return_output):
+        st.markdown('<div class="best-case-note">The result is calculated for the best case scenario.</div>', unsafe_allow_html=True)
     close_panel()
