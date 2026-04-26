@@ -3,6 +3,7 @@
 # =========================================================
 
 from dataclasses import dataclass, asdict
+from functools import lru_cache
 from pathlib import Path
 import csv
 from typing import Any, Dict, List, Optional, Tuple
@@ -18,6 +19,7 @@ KU_BAND_EIRP_CSVS = {
     "indiaplus": Path(__file__).with_name("KuINDband.csv"),
     "philippines": Path(__file__).with_name("KuPHPband.csv"),
 }
+KU_BAND_EIRP_CSV_PATHS = tuple(dict.fromkeys(KU_BAND_EIRP_CSVS.values()))
 
 # ----------------------------
 # KU BAND DATABASE
@@ -81,6 +83,7 @@ class LinkInputs:
     roll_off: float = DEFAULT_ROLL_OFF
     atmospheric_attenuation_db: float = 0.25
     gt_db_per_k: float = 15.6
+    system_noise_temp_k: float = 145.0
     c_asi_db: float = 50.0
     c_xpi_db: float = 30.0
     c_im_db: float = 43.0
@@ -146,6 +149,7 @@ def _row_value(row: Dict[str, Any], *candidates: str):
             return value
     raise KeyError(f"Missing columns: {candidates}")
 
+@lru_cache(maxsize=None)
 def load_ku_band_eirp_rows(csv_path: Path) -> List[Dict[str, float]]:
     rows: List[Dict[str, float]] = []
     if not csv_path.exists():
@@ -188,6 +192,39 @@ def resolve_ku_band_eirp_from_csv(lon_deg: float, lat_deg: float, default_eirp_d
         "eirp_dbw": selected_row["eirp_dbw"],
     }
 
+def resolve_ku_band_eirp_from_all_csvs(lon_deg: float, lat_deg: float, default_eirp_dbw: float):
+    candidates = []
+    for csv_path in KU_BAND_EIRP_CSV_PATHS:
+        rows = load_ku_band_eirp_rows(csv_path)
+        nearest = None
+        for index, row in enumerate(rows, start=1):
+            distance_km = haversine_distance_km(row["latitude"], row["longitude"], lat_deg, lon_deg)
+            candidate = (distance_km, csv_path, index, row)
+            if nearest is None or distance_km < nearest[0]:
+                nearest = candidate
+        if nearest is not None:
+            candidates.append(nearest)
+
+    if not candidates:
+        return {
+            "source": "default",
+            "csv": None,
+            "index": None,
+            "min_distance_km": None,
+            "selected_row": None,
+            "eirp_dbw": default_eirp_dbw,
+        }
+
+    min_distance_km, csv_path, index, selected_row = max(candidates, key=lambda item: item[3]["eirp_dbw"])
+    return {
+        "source": "csv",
+        "csv": csv_path.name,
+        "index": index,
+        "min_distance_km": min_distance_km,
+        "selected_row": selected_row,
+        "eirp_dbw": selected_row["eirp_dbw"],
+    }
+
 def resolve_contour_values(band_name: str, lon_deg: float, lat_deg: float, threshold_km: float = DEFAULT_THRESHOLD_KM):
     db, def_eirp, def_dl, def_ul = _band_cfg(band_name)
     rows = []
@@ -196,11 +233,8 @@ def resolve_contour_values(band_name: str, lon_deg: float, lat_deg: float, thres
         rows.append((i, d, r))
     idx, min_d, row = min(rows, key=lambda x: x[1])
     use_db = min_d <= threshold_km
-    csv_path = None
-    if _band_key(band_name) == "ku band" and use_db:
-        csv_path = KU_BAND_EIRP_CSVS.get((row.get("country") or "").strip().lower())
     eirp_lookup = (
-        resolve_ku_band_eirp_from_csv(lon_deg, lat_deg, def_eirp, csv_path)
+        resolve_ku_band_eirp_from_all_csvs(lon_deg, lat_deg, def_eirp)
         if _band_key(band_name) == "ku band"
         else None
     )
@@ -215,7 +249,7 @@ def resolve_contour_values(band_name: str, lon_deg: float, lat_deg: float, thres
             else (row["best_eirp"] if use_db else def_eirp)
         ),
         "eirp_source": None if eirp_lookup is None else eirp_lookup["source"],
-        "eirp_csv": None if csv_path is None else csv_path.name,
+        "eirp_csv": None if eirp_lookup is None else eirp_lookup.get("csv"),
         "eirp_index": None if eirp_lookup is None else eirp_lookup.get("index"),
         "eirp_min_distance_km": None if eirp_lookup is None else eirp_lookup["min_distance_km"],
         "eirp_selected_row": None if eirp_lookup is None else eirp_lookup["selected_row"],
@@ -260,7 +294,7 @@ def calc_uplink(link: LinkInputs):
 def calc_satellite_useful_eirp(sat: SatelliteInputs, rx: LinkInputs):
     effective_sat_eirp = sat.satellite_eirp_dbw - sat.transponder_backoff_db
 
-    useful_eirp = effective_sat_eirp - rx.loss_db
+    useful_eirp = sat.satellite_eirp_dbw
 
     return {
         "effective_satellite_eirp_dbw": effective_sat_eirp,
@@ -269,6 +303,7 @@ def calc_satellite_useful_eirp(sat: SatelliteInputs, rx: LinkInputs):
 
 def calc_downlink(useful_eirp_dbw, rx: LinkInputs):
     grx = antenna_gain_db(rx.frequency_ghz, rx.antenna_diameter_m, rx.efficiency_percent)
+    gt_db_per_k = grx - 10 * math.log10(rx.system_noise_temp_k)
     fspl = fspl_db(rx.frequency_ghz, rx.slant_range_km)
     bw_hz = occ_bw_hz(rx.bandwidth_mhz, rx.roll_off)
 
@@ -276,7 +311,7 @@ def calc_downlink(useful_eirp_dbw, rx: LinkInputs):
         useful_eirp_dbw
         - rx.atmospheric_attenuation_db
         - fspl
-        + rx.gt_db_per_k
+        + gt_db_per_k
         + BOLTZMANN_DB
         - 10 * math.log10(bw_hz)
     )
@@ -291,6 +326,7 @@ def calc_downlink(useful_eirp_dbw, rx: LinkInputs):
 
     return {
         "grx_db": grx,
+        "gt_db_per_k": gt_db_per_k,
         "fspl_db": fspl,
         "c_n_db": c_n_db,
         "cni_db": cni
@@ -338,11 +374,19 @@ def calculate_forward_and_return_for_dashboard(
         f_res = calculate_complete_link(f_ul, f_dl, f_sat)
 
         r_res, r_contour = None, None
-        if return_uplink and return_downlink and return_satellite and return_uplink.user_longitude_deg is not None and return_uplink.user_latitude_deg is not None:
+        if return_uplink and return_downlink and return_satellite:
+            return_contour_lon = return_downlink.user_longitude_deg
+            return_contour_lat = return_downlink.user_latitude_deg
+            if return_contour_lon is None or return_contour_lat is None:
+                return_contour_lon = return_uplink.user_longitude_deg
+                return_contour_lat = return_uplink.user_latitude_deg
+            if return_contour_lon is None or return_contour_lat is None:
+                raise ValueError("Return contour location missing")
+
             r_contour = resolve_contour_values(
                 band_name,
-                return_uplink.user_longitude_deg,
-                return_uplink.user_latitude_deg
+                return_contour_lon,
+                return_contour_lat,
             )
             r_ul = LinkInputs(**{**asdict(return_uplink), "atmospheric_attenuation_db": r_contour["att_cs_uplink_db"]})
             r_dl = LinkInputs(**{**asdict(return_downlink), "atmospheric_attenuation_db": r_contour["att_cs_downlink_db"]})

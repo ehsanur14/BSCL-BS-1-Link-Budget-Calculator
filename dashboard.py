@@ -3,6 +3,7 @@
 # =========================================================
 
 from pathlib import Path
+from html import escape
 
 import folium
 import streamlit as st
@@ -38,7 +39,6 @@ def null_text(value, nd=2):
         return ""
 
 
-@st.cache_data(show_spinner=False)
 def safe_position(lat_deg, lon_deg, sat_lon_deg):
     try:
         if not validate_coordinates(lat_deg, lon_deg):
@@ -285,26 +285,35 @@ def render_uplink_inputs(purpose, selected_station, uplink_freq_default):
     disabled = selected_station is not None
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
-        st.number_input("Longitude (deg E)", format="%.3f", key="uplink_long", disabled=disabled)
+        uplink_lon = st.number_input("Longitude (deg E)", format="%.3f", step=1.0, key="uplink_long", disabled=disabled)
     with c2:
-        st.number_input("Latitude (deg N)", format="%.3f", key="uplink_lat", disabled=disabled)
+        uplink_lat = st.number_input("Latitude (deg N)", format="%.3f", step=1.0, key="uplink_lat", disabled=disabled)
     with c3:
         st.text_input("Uplink Frequency (GHz)", value=f"{uplink_freq_default:.2f}", disabled=True)
 
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
-        bandwidth = st.number_input("Bandwidth (MHz)", value=36.0, format="%.2f", key="uplink_bw")
+        bandwidth = st.number_input(
+            "Bandwidth (MHz)",
+            value=36.0,
+            min_value=0.0,
+            max_value=36.0,
+            format="%.2f",
+            step=1.0,
+            key="uplink_bw",
+        )
     with c2:
         feed_power = st.number_input(
             "Feed Power (W)",
             value=100.0 if purpose == "VSAT" else 200.0,
             format="%.2f",
+            step=1.0,
             key="uplink_feed_power",
         )
     with c3:
-        antenna_dia = st.number_input("Antenna Dia (m)", value=8.0, format="%.2f", key="uplink_ant_dia")
+        antenna_dia = st.number_input("Antenna Dia (m)", value=8.0, format="%.2f", step=1.0, key="uplink_ant_dia")
 
-    return bandwidth, feed_power, antenna_dia
+    return uplink_lon, uplink_lat, bandwidth, feed_power, antenna_dia
 
 
 def render_downlink_inputs(purpose, downlink_freq_default):
@@ -313,9 +322,9 @@ def render_downlink_inputs(purpose, downlink_freq_default):
 
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
-        st.number_input("Longitude (deg E)", format="%.6f", key="downlink_long")
+        downlink_lon = st.number_input("Longitude (deg E)", format="%.3f", step=1.0, key="downlink_long")
     with c2:
-        st.number_input("Latitude (deg N)", format="%.6f", key="downlink_lat")
+        downlink_lat = st.number_input("Latitude (deg N)", format="%.3f", step=1.0, key="downlink_lat")
     with c3:
         st.text_input("Downlink Frequency (GHz)", value=f"{downlink_freq_default:.3f}", disabled=True)
 
@@ -325,11 +334,12 @@ def render_downlink_inputs(purpose, downlink_freq_default):
             "Antenna Dia (m)",
             value=0.70 if purpose == "VSAT" else 1.80,
             format="%.2f",
+            step=1.0,
             key="downlink_ant_dia",
         )
     with c2:
         return_feed_power = (
-            st.number_input("Return Feed Power (W)", value=20.0, format="%.2f", key="return_feed_power")
+            st.number_input("Return Feed Power (W)", value=20.0, format="%.2f", step=1.0, key="return_feed_power")
             if purpose == "VSAT"
             else None
         )
@@ -342,7 +352,12 @@ def render_downlink_inputs(purpose, downlink_freq_default):
     fwd_rx_lnb = 0.0
     rtn_rx_lnb = 0.0
 
-    return antenna_dia, return_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb
+    return downlink_lon, downlink_lat, antenna_dia, return_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb
+
+
+def calculate_button(key="calculate_link_budget"):
+    st.markdown('<div style="height:.35rem"></div>', unsafe_allow_html=True)
+    return st.button("Calculate", key=key, use_container_width=True)
 
 
 def render_position(title, position, prefix):
@@ -352,9 +367,23 @@ def render_position(title, position, prefix):
     cols = st.columns(2, gap="small")
     for col, label, key in zip(cols, labels, POSITION_KEYS[:2]):
         with col:
-            st.text_input(label, value=null_text(position[key]), disabled=True, key=f"{prefix}_{key}")
+            readonly_value(label, null_text(position[key]))
     close_div()
     close_div()
+
+
+def readonly_value(label, value):
+    safe_label = escape(str(label))
+    safe_value = escape(str(value))
+    st.markdown(
+        f"""
+        <div class="readonly-field">
+            <div class="readonly-label">{safe_label}</div>
+            <div class="readonly-value">{safe_value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_output(title, output, prefix):
@@ -366,8 +395,18 @@ def render_output(title, output, prefix):
     cols = [top_cols[0], top_cols[1], bottom_cols[0], bottom_cols[1]]
     for col, label, key, nd in zip(cols, labels, OUTPUT_KEYS, nds):
         with col:
-            st.text_input(label, value=null_text(output[key], nd), disabled=True, key=f"{prefix}_{key}")
+            readonly_value(label, null_text(output[key], nd))
     close_div()
+
+
+def has_negative_elevation(*positions):
+    for position in positions:
+        try:
+            if position.get("elevation_deg") not in ("", None) and float(position["elevation_deg"]) < 0:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def link_inputs(freq, bandwidth, power, antenna_dia, slant_range, lnb=0.0, lon=None, lat=None):
@@ -394,7 +433,6 @@ def make_output(link_result, modcod_result, direction):
     }
 
 
-@st.cache_data(show_spinner=False)
 def calculate_outputs(inputs):
     forward_output = EMPTY_OUTPUT.copy()
     return_output = EMPTY_OUTPUT.copy()
@@ -447,6 +485,8 @@ def calculate_outputs(inputs):
                 inputs["uplink_antenna_dia"],
                 inputs["uplink_pos"]["slant_range_km"],
                 inputs["rtn_rx_lnb"],
+                inputs["uplink_lon"],
+                inputs["uplink_lat"],
             )
             return_satellite = SatelliteInputs(satellite_eirp_dbw=inputs["band_info"]["defaults"]["best_eirp_dbw"])
 
@@ -680,6 +720,39 @@ div[data-testid="stNumberInput"] input[disabled]{
     opacity:1!important;
     font-weight:800!important;
 }
+.readonly-field{
+    margin:0 0 .45rem 0;
+}
+.readonly-label{
+    font-size:.76rem;
+    font-weight:700;
+    color:#3d4c62;
+    margin:0 0 .18rem 0;
+}
+.readonly-value{
+    min-height:2.42rem;
+    display:flex;
+    align-items:center;
+    border:1px solid #dfe5ee;
+    border-radius:14px;
+    background:var(--input);
+    color:#27384f;
+    font-size:.92rem;
+    font-weight:800;
+    padding:.42rem .8rem;
+}
+.nb-note{
+    display:inline-flex;
+    align-items:center;
+    border:1px solid #efc7c7;
+    border-radius:10px;
+    background:#fff2f2;
+    color:#8b2c2c;
+    font-size:.78rem;
+    font-weight:800;
+    padding:.32rem .58rem;
+    margin:.16rem 0 .35rem 0;
+}
 div[data-testid="stCheckbox"]{padding-top:.18rem;}
 div[data-testid="stRadio"] label{font-weight:700!important;}
 div[data-testid="stButton"] > button{
@@ -691,10 +764,13 @@ div[data-testid="stButton"] > button{
     font-weight:800;
     font-size:.9rem;
 }
-div[data-testid="stButton"] > button:hover{
-    border-color:#1d507f;
-    background:linear-gradient(180deg, #2a6fab 0%, #1f5689 100%);
-    color:#fff;
+div[data-testid="stButton"] > button:hover,
+div[data-testid="stButton"] > button:focus,
+div[data-testid="stButton"] > button:active{
+    border-color:#2d8a43!important;
+    background:#dff4e4!important;
+    color:#14351f!important;
+    box-shadow:0 0 0 1px rgba(45,138,67,.18)!important;
 }
 div[data-testid="stButton"] > button[kind="secondary"]{
     background:#fff;
@@ -740,6 +816,10 @@ session_defaults({
     "uplink_saved_location": (23.98, 90.74),
     "downlink_saved_location": (14.58, 90.99),
     "active_map_picker": None,
+    "stored_forward_output": EMPTY_OUTPUT.copy(),
+    "stored_return_output": EMPTY_OUTPUT.copy(),
+    "stored_debug_payload": {},
+    "stored_inputs": None,
 })
 
 satellite_longitude = SATELLITE_PRESETS[SATELLITE_NAME]["orbital_longitude_deg"]
@@ -762,32 +842,25 @@ with main_left:
     uplink_freq_default = float(band_info["frequency_ghz"]["uplink"])
     downlink_freq_default = float(band_info["frequency_ghz"]["downlink"])
 
-    uplink_bandwidth, uplink_feed_power, uplink_antenna_dia = render_uplink_inputs(
+    uplink_lon, uplink_lat, uplink_bandwidth, uplink_feed_power, uplink_antenna_dia = render_uplink_inputs(
         purpose,
         selected_bscl_station,
         uplink_freq_default,
     )
     st.markdown('<div style="height:.45rem"></div>', unsafe_allow_html=True)
-    downlink_antenna_dia, return_link_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb = render_downlink_inputs(
+    downlink_lon, downlink_lat, downlink_antenna_dia, return_link_feed_power, use_lnb, fwd_rx_lnb, rtn_rx_lnb = render_downlink_inputs(
         purpose,
         downlink_freq_default,
     )
+    calculate_clicked = calculate_button()
     close_panel()
 
-uplink_lon = float(st.session_state["uplink_long"])
-uplink_lat = float(st.session_state["uplink_lat"])
-downlink_lon = float(st.session_state["downlink_long"])
-downlink_lat = float(st.session_state["downlink_lat"])
+uplink_lon = float(uplink_lon)
+uplink_lat = float(uplink_lat)
+downlink_lon = float(downlink_lon)
+downlink_lat = float(downlink_lat)
 
-if not validate_coordinates(uplink_lat, uplink_lon):
-    st.warning("Uplink coordinates are outside valid range.")
-if not validate_coordinates(downlink_lat, downlink_lon):
-    st.warning("Downlink coordinates are outside valid range.")
-
-uplink_pos = safe_position(uplink_lat, uplink_lon, satellite_longitude)
-downlink_pos = safe_position(downlink_lat, downlink_lon, satellite_longitude)
-
-forward_output, return_output, debug_payload = calculate_outputs({
+current_inputs = {
     "purpose": purpose,
     "frequency_band": frequency_band,
     "band_info": band_info,
@@ -804,14 +877,39 @@ forward_output, return_output, debug_payload = calculate_outputs({
     "uplink_lat": uplink_lat,
     "downlink_lon": downlink_lon,
     "downlink_lat": downlink_lat,
-    "uplink_pos": uplink_pos,
-    "downlink_pos": downlink_pos,
-})
+}
+
+uplink_pos = safe_position(uplink_lat, uplink_lon, satellite_longitude)
+downlink_pos = safe_position(downlink_lat, downlink_lon, satellite_longitude)
+
+if calculate_clicked or st.session_state.stored_inputs is None:
+    calc_inputs = {
+        **current_inputs,
+        "uplink_pos": uplink_pos,
+        "downlink_pos": downlink_pos,
+    }
+    forward_output, return_output, debug_payload = calculate_outputs(calc_inputs)
+    st.session_state.stored_forward_output = forward_output
+    st.session_state.stored_return_output = return_output
+    st.session_state.stored_debug_payload = debug_payload
+    st.session_state.stored_inputs = current_inputs.copy()
+
+inputs_are_current = st.session_state.stored_inputs == current_inputs
+forward_output = st.session_state.stored_forward_output if inputs_are_current else EMPTY_OUTPUT.copy()
+return_output = st.session_state.stored_return_output if inputs_are_current else EMPTY_OUTPUT.copy()
+debug_payload = st.session_state.stored_debug_payload
+
+if not validate_coordinates(uplink_lat, uplink_lon):
+    st.warning("Uplink coordinates are outside valid range.")
+if not validate_coordinates(downlink_lat, downlink_lon):
+    st.warning("Downlink coordinates are outside valid range.")
 
 with main_right:
     open_panel()
-    panel_title("Outputs", "Calculated")
+    panel_title("Outputs", "Calculated" if inputs_are_current else "Click Calculate")
     section_bar("Antenna Positioning")
+    if has_negative_elevation(uplink_pos, downlink_pos):
+        st.markdown('<div class="nb-note">NB: satellite coverage nai</div>', unsafe_allow_html=True)
     p1, p2 = st.columns(2, gap="small")
     with p1:
         render_position("Uplink Antenna Positioning", uplink_pos, "uplink_position")
