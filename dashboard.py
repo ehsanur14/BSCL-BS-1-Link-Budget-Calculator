@@ -588,7 +588,13 @@ footer{display:none!important;}
     border-radius:0;
     box-shadow:none;
     padding:0;
-    margin:0 0 .6rem 0;
+    margin:-.25rem 0 .2rem 0;
+}
+.hero-shell [data-testid="stImage"]{
+    margin:0!important;
+}
+.hero-shell [data-testid="stImage"] img{
+    display:block;
 }
 .hero-logo, .hero-satellite{
     background:transparent;
