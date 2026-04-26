@@ -303,9 +303,12 @@ def calc_uplink(link: LinkInputs):
     }
 
 def calc_satellite_useful_eirp(sat: SatelliteInputs, rx: LinkInputs):
-    effective_sat_eirp = sat.satellite_eirp_dbw - sat.transponder_backoff_db
+    effective_sat_eirp = 10 * math.log10(
+        (rx.bandwidth_mhz / 36.0)
+        * 10 ** ((sat.satellite_eirp_dbw - sat.transponder_backoff_db) / 10)
+    )
 
-    useful_eirp = sat.satellite_eirp_dbw
+    useful_eirp = effective_sat_eirp
 
     return {
         "effective_satellite_eirp_dbw": effective_sat_eirp,
