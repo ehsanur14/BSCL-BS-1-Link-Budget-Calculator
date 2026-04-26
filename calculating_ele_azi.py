@@ -10,7 +10,7 @@ GEO_RADIUS_KM = 42164.0
 
 def validate_coordinates(lat_deg, lon_deg):
     try:
-        return lat_deg is not None and lon_deg is not None and -90 <= float(lat_deg) <= 90 and -180 <= float(lon_deg) <= 180
+        return lat_deg is not None and lon_deg is not None and -180 <= float(lat_deg) <= 180 and -180 <= float(lon_deg) <= 180
     except Exception:
         return False
 

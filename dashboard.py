@@ -285,9 +285,25 @@ def render_uplink_inputs(purpose, selected_station, uplink_freq_default):
     disabled = selected_station is not None
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
-        uplink_lon = st.number_input("Longitude (deg E)", format="%.3f", step=1.0, key="uplink_long", disabled=disabled)
+        uplink_lon = st.number_input(
+            "Longitude (deg E)",
+            min_value=-180.0,
+            max_value=180.0,
+            format="%.3f",
+            step=1.0,
+            key="uplink_long",
+            disabled=disabled,
+        )
     with c2:
-        uplink_lat = st.number_input("Latitude (deg N)", format="%.3f", step=1.0, key="uplink_lat", disabled=disabled)
+        uplink_lat = st.number_input(
+            "Latitude (deg N)",
+            min_value=-180.0,
+            max_value=180.0,
+            format="%.3f",
+            step=1.0,
+            key="uplink_lat",
+            disabled=disabled,
+        )
     with c3:
         st.text_input("Uplink Frequency (GHz)", value=f"{uplink_freq_default:.2f}", disabled=True)
 
@@ -322,9 +338,23 @@ def render_downlink_inputs(purpose, downlink_freq_default):
 
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
-        downlink_lon = st.number_input("Longitude (deg E)", format="%.3f", step=1.0, key="downlink_long")
+        downlink_lon = st.number_input(
+            "Longitude (deg E)",
+            min_value=-180.0,
+            max_value=180.0,
+            format="%.3f",
+            step=1.0,
+            key="downlink_long",
+        )
     with c2:
-        downlink_lat = st.number_input("Latitude (deg N)", format="%.3f", step=1.0, key="downlink_lat")
+        downlink_lat = st.number_input(
+            "Latitude (deg N)",
+            min_value=-180.0,
+            max_value=180.0,
+            format="%.3f",
+            step=1.0,
+            key="downlink_lat",
+        )
     with c3:
         st.text_input("Downlink Frequency (GHz)", value=f"{downlink_freq_default:.3f}", disabled=True)
 
@@ -543,15 +573,21 @@ st.markdown("""
 html, body, .stApp, [data-testid="stAppViewContainer"]{
     background:linear-gradient(180deg,#f5f6fa 0%,#eef1f6 100%); color:var(--text);
 }
-header[data-testid="stHeader"], [data-testid="collapsedControl"]{display:none;}
+header[data-testid="stHeader"],
+[data-testid="collapsedControl"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+#MainMenu,
+footer{display:none!important;}
 .block-container{max-width:1920px;padding-top:.18rem;padding-bottom:.18rem;padding-left:.9rem;padding-right:.9rem;}
 .stMarkdown p, div[data-testid="stVerticalBlock"] > div{margin-bottom:.04rem;}
 .hero-shell{
-    background:#02060d;
-    border:1px solid #293243;
+    background:transparent;
+    border:none;
     border-radius:0;
-    box-shadow:0 12px 30px rgba(10, 16, 28, .22);
-    padding:.18rem .35rem;
+    box-shadow:none;
+    padding:0;
     margin:0 0 .6rem 0;
 }
 .hero-logo, .hero-satellite{
@@ -606,7 +642,7 @@ header[data-testid="stHeader"], [data-testid="collapsedControl"]{display:none;}
 .app-panel{
     background:var(--panel);
     border:1px solid var(--line);
-    border-radius:22px;
+    border-radius:0;
     box-shadow:var(--shadow);
     padding:.8rem .85rem .72rem;
     height:100%;
@@ -626,7 +662,7 @@ header[data-testid="stHeader"], [data-testid="collapsedControl"]{display:none;}
 .panel-status{
     display:inline-flex;
     align-items:center;
-    border-radius:999px;
+    border-radius:0;
     padding:.32rem .72rem;
     background:var(--chip);
     color:var(--chip-text);
@@ -637,7 +673,7 @@ header[data-testid="stHeader"], [data-testid="collapsedControl"]{display:none;}
     width:100%;
     background:linear-gradient(180deg,#eff5fc 0%, #e4ecf8 100%);
     border:1px solid #d5deeb;
-    border-radius:13px;
+    border-radius:0;
     color:#264260;
     font-weight:800;
     text-align:left;
@@ -649,7 +685,7 @@ header[data-testid="stHeader"], [data-testid="collapsedControl"]{display:none;}
     width:100%;
     background:linear-gradient(180deg,#eef3fb 0%, #e5edf8 100%);
     border:1px solid #d4ddeb;
-    border-radius:12px;
+    border-radius:0;
     color:#293c55;
     font-weight:800;
     text-align:left;
@@ -671,7 +707,7 @@ header[data-testid="stHeader"], [data-testid="collapsedControl"]{display:none;}
     background:#eef3f8;
     border:1px solid #bcc9d7;
     border-bottom:none;
-    border-radius:10px 10px 0 0;
+    border-radius:0;
     color:#22324a;
     font-weight:800;
     text-align:center;
@@ -682,7 +718,7 @@ header[data-testid="stHeader"], [data-testid="collapsedControl"]{display:none;}
 .stat-panel{
     background:#fff;
     border:1px solid #dde4ef;
-    border-radius:18px;
+    border-radius:0;
     box-shadow:0 6px 18px rgba(30, 52, 89, .06);
     padding:.62rem .7rem .5rem;
     margin:.26rem 0 0 0;
@@ -705,7 +741,7 @@ label, .stSelectbox label, .stTextInput label, .stNumberInput label{
 div[data-testid="stTextInput"] input,
 div[data-testid="stNumberInput"] input,
 div[data-testid="stSelectbox"] > div{
-    border-radius:14px!important;
+    border-radius:0!important;
     min-height:2.42rem!important;
     border:1px solid #dfe5ee!important;
     box-shadow:none!important;
@@ -734,7 +770,7 @@ div[data-testid="stNumberInput"] input[disabled]{
     display:flex;
     align-items:center;
     border:1px solid #dfe5ee;
-    border-radius:14px;
+    border-radius:0;
     background:var(--input);
     color:#27384f;
     font-size:.92rem;
@@ -745,7 +781,7 @@ div[data-testid="stNumberInput"] input[disabled]{
     display:inline-flex;
     align-items:center;
     border:1px solid #efc7c7;
-    border-radius:10px;
+    border-radius:0;
     background:#fff2f2;
     color:#8b2c2c;
     font-size:.78rem;
@@ -757,7 +793,7 @@ div[data-testid="stCheckbox"]{padding-top:.18rem;}
 div[data-testid="stRadio"] label{font-weight:700!important;}
 div[data-testid="stButton"] > button{
     min-height:2.45rem;
-    border-radius:14px;
+    border-radius:0;
     border:1px solid #2f6da6;
     background:linear-gradient(180deg, #2d78ba 0%, #235f99 100%);
     color:#fff;
@@ -779,12 +815,12 @@ div[data-testid="stButton"] > button[kind="secondary"]{
 .map-control-row div[data-testid="stButton"] > button{
     min-height:2rem!important;
     padding:.18rem .8rem!important;
-    border-radius:11px!important;
+    border-radius:0!important;
     font-size:.78rem!important;
 }
 .map-control-row div[data-testid="stSelectbox"] > div{
     min-height:2rem!important;
-    border-radius:11px!important;
+    border-radius:0!important;
 }
 [data-testid="column"] > div:has(.app-panel){
     height:100%;
@@ -829,7 +865,6 @@ if active_map_picker in {"uplink", "downlink"}:
     render_map_picker_screen(active_map_picker)
     st.stop()
 
-render_header()
 main_left, main_right = st.columns([1.28, 1.0], gap="large")
 with main_left:
     open_panel()
@@ -900,9 +935,9 @@ return_output = st.session_state.stored_return_output if inputs_are_current else
 debug_payload = st.session_state.stored_debug_payload
 
 if not validate_coordinates(uplink_lat, uplink_lon):
-    st.warning("Uplink coordinates are outside valid range.")
+    st.warning("Uplink latitude/longitude -180 to 180 range er moddhe dite hobe. Shothik position din.")
 if not validate_coordinates(downlink_lat, downlink_lon):
-    st.warning("Downlink coordinates are outside valid range.")
+    st.warning("Downlink latitude/longitude -180 to 180 range er moddhe dite hobe. Shothik position din.")
 
 with main_right:
     open_panel()
